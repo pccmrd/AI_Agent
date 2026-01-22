@@ -1,0 +1,399 @@
+{
+  "name": "task 4 complete actual",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks"
+            }
+          ]
+        }
+      },
+      "id": "4282a49e-8343-4119-ba2c-2c37a2f0c693",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.hh.ru/vacancies",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "data scientist OR ML Engineer OR Machine Learning"
+            },
+            {
+              "name": "per_page",
+              "value": "10"
+            },
+            {
+              "name": "period",
+              "value": "250"
+            },
+            {
+              "name": "search_field",
+              "value": "name"
+            },
+            {
+              "name": "area",
+              "value": "113"
+            },
+            {
+              "name": "page",
+              "value": "0"
+            },
+            {
+              "name": "Experience",
+              "value": "noExperience"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "api-test"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ee4b7d58-4187-40f7-9cb6-589ae889e262",
+      "name": "HH Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "options": {}
+      },
+      "id": "fc16d898-cd57-4cab-8621-6bbce6ddbce1",
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "api-test"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0ae3182b-2559-4b1b-b373-2188785bb7c4",
+      "name": "Get Full Vacancy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        620,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "-1003408845019",
+        "text": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "id": "64f8d18b-e66f-44a6-a329-7f3c093f207f",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        2180,
+        0
+      ],
+      "webhookId": "d4202c26-89cf-471c-98b5-a1a4b4724c4c",
+      "credentials": {
+        "telegramApi": {
+          "id": "FNBQFIRiRqrrgJtN",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "GigaChat/GigaChat-2-Max",
+          "mode": "list",
+          "cachedResultName": "GigaChat/GigaChat-2-Max"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        200
+      ],
+      "id": "7945a0fe-83ec-47d2-b426-f91d392a882a",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "mNtNKxG1UdpLQFnJ",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "GigaChat/GigaChat-2-Max",
+          "mode": "list",
+          "cachedResultName": "GigaChat/GigaChat-2-Max"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1520,
+        220
+      ],
+      "id": "707dea12-ec1b-4d37-a9d9-a78378e93252",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "mNtNKxG1UdpLQFnJ",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get the inputs\nconst mapItem = $input.first(); \nconst rawData = mapItem.json.output || mapItem.json.text; \n\n// 2. Parse the AI's JSON Map\nlet skillMap = {};\ntry {\n  const jsonMatch = rawData.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n      skillMap = JSON.parse(jsonMatch[0]);\n  } else {\n      skillMap = JSON.parse(rawData);\n  }\n} catch (e) {\n  console.log(\"AI JSON Parse Error, using raw names\");\n}\n\n// 3. Get data from the Aggregator\n// We need 'full_list' for counting and 'vacancy_count' for the message header\nconst previousNodeData = $items(\"Code Aggregator\")[0].json; \nconst fullList = previousNodeData.full_list;\nconst totalVacancies = previousNodeData.vacancy_count || 0; // Get the \"N\"\n\n// 4. Count and Normalize\nconst counts = {};\n\nfor (const rawSkill of fullList) {\n    let key = rawSkill;\n    \n    // Normalize using AI map\n    if (skillMap[key]) {\n        key = skillMap[key];\n    } else if (skillMap[key.toLowerCase()]) {\n        key = skillMap[key.toLowerCase()];\n    }\n\n    // Capitalize for display\n    const cleanName = key.charAt(0).toUpperCase() + key.slice(1);\n    counts[cleanName] = (counts[cleanName] || 0) + 1;\n}\n\n// 5. Sort Top 15\nconst sorted = Object.entries(counts)\n    .sort((a, b) => b[1] - a[1])\n    .slice(0, 15);\n\n// 6. Format Message (Your Exact Template)\nlet msg = `*На этой неделе я спарсил ${totalVacancies} свежих вакансий по выбранному тобой направлению. Самыми популярными являются следующие требования:*\\n\\n`;\n\nsorted.forEach(([skill, count]) => {\n    msg += `- *${skill}: ${count}*\\n`;\n});\n\nreturn [{ json: { message: msg } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1940,
+        0
+      ],
+      "id": "474cec85-0c1c-49c8-b3f5-456e882e64a0",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Get all executions from the AI Parser\nconst items = $input.all(); \nconst vacancyCount = items.length; // Count how many jobs we processed\n\nlet allRawSkills = [];\n\n// 2. Extract every single skill found so far\nfor (const item of items) {\n  const text = item.json.output || item.json.text || \"\";\n  \n  const skills = text.split('\\n')\n                     .map(s => s.trim())\n                     .filter(s => s.length > 1);\n  \n  allRawSkills.push(...skills);\n}\n\n// 3. Create a UNIQUE list for the AI\nconst uniqueSkills = [...new Set(allRawSkills)];\n\n// 4. Pass data forward, INCLUDING the vacancy_count\nreturn [{\n  json: {\n    unique_list: uniqueSkills.join(', '),\n    full_list: allRawSkills,\n    vacancy_count: vacancyCount\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        0
+      ],
+      "id": "355ef0ab-8fe0-409b-ba87-3c7a76a94d69",
+      "name": "Code Aggregator"
+    },
+    {
+      "parameters": {
+        "promptType": "==",
+        "text": "={{ $json.unique_list }}",
+        "options": {
+          "systemMessage": "Ты — строгий Data Engineer. Твоя задача — нормализовать список технических навыков.\n\n1. Я дам тебе список навыков через запятую.\n2. Ты должен найти синонимы и привести их к единому стандарту (на английском).\n3. Пример логики: \n   - \"cv\", \"computer vision\", \"компьютерное зрение\" -> \"Computer Vision\"\n   - \"pyton\", \"python 3\" -> \"Python\"\n   - \"ml\", \"machine learning\" -> \"Machine Learning\"\n\n4. Если навык уже написан корректно, оставь его как есть.\n\nВАЖНО: Твой ответ должен быть ТОЛЬКО валидным JSON объектом (Dictionary), где ключ — это исходное название (из моего списка), а значение — исправленное стандартное название.\n\nПример ответа:\n{\n  \"cv\": \"Computer Vision\",\n  \"pyton\": \"Python\",\n  \"react.js\": \"React\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        1580,
+        0
+      ],
+      "id": "67654527-1a4d-40d8-832b-fdfa939d5272",
+      "name": "Normalizer AI"
+    },
+    {
+      "parameters": {
+        "promptType": "==",
+        "text": "=Описание вакансии: {{ $json.prompt_text }}",
+        "options": {
+          "systemMessage": "Ты специалист по парсингу данных о вакансиях полученных через API HH.ru\n*****Твоя ЗАДАЧА: Выделить из описания вакансии требования к кандитату (компетенции и скиллы) и передать список этих компетенция дальше, максимально сокращая название компетенции/скилла, не теряя его смысл*****\n\n*****ФОРМАТ выдачи данных:\n\nкомпетенция1\nкомпетенция2\nкомпетенция3\n...\nскилл1\nскилл2\nскилл3\n...\n\n****Переводи названия компетенций и скиллов на английский язык****\n***Не нумеруй список, просто одно завание в одной строчке***\n******Ты должен понимать, что такие скиллы/компетенции как Python и Python Programming это одно и тоже пиши короче - просто Python или просто pandas- не плоди сущности; не разворачивай описания******"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "2799704f-59d6-4400-b149-cf5323ffdcc2",
+      "name": "Parser AI",
+      "retryOnFail": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all items from the previous node\nconst items = $input.all();\nconst returnData = [];\n\nfor (const item of items) {\n  // Get the description, or empty string if missing\n  const rawHtml = item.json.description || '';\n\n  // 1. Replace <br> and closing tags with a space to prevent word merging\n  // (e.g. \"Skills</div><div>Python\" becomes \"Skills Python\")\n  let cleanText = rawHtml.replace(/<[^>]+>/g, ' ');\n\n  // 2. Decode common HTML entities manually (since we don't have external libs)\n  cleanText = cleanText\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&quot;/g, '\"')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>');\n\n  // 3. Remove duplicate whitespaces and trim\n  cleanText = cleanText.replace(/\\s\\s+/g, ' ').trim();\n\n  // Create the output item\n  // We keep the original ID so we can track it if needed\n  returnData.push({\n    json: {\n      id: item.json.id,\n      name: item.json.name,\n      prompt_text: cleanText\n    }\n  });\n}\n\nreturn returnData;"
+      },
+      "id": "7511d7fc-6d4f-42cb-8629-99cc0314766a",
+      "name": "Cleaning Raw data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HH Search": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "Get Full Vacancy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Full Vacancy": {
+      "main": [
+        [
+          {
+            "node": "Cleaning Raw data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "HH Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Parser AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Normalizer AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Aggregator": {
+      "main": [
+        [
+          {
+            "node": "Normalizer AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizer AI": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser AI": {
+      "main": [
+        [
+          {
+            "node": "Code Aggregator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaning Raw data": {
+      "main": [
+        [
+          {
+            "node": "Parser AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5e11bdaf-1579-4569-91ac-41acf1e471cf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "899191813b11fe87cd4aaac6f1c5befb8b483d20520c6567e241e322ebf82b1c"
+  },
+  "id": "8bZyDp2QI4KMeUtu",
+  "tags": []
+}

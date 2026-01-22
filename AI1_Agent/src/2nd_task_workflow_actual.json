@@ -1,0 +1,198 @@
+{
+  "name": "2nd task workflow actual",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1120,
+        500
+      ],
+      "id": "2c67ab57-fe80-4fda-8cf4-5b9f676a0ec7",
+      "name": "Telegram Trigger",
+      "webhookId": "6d6cb3f8-f1ca-41b0-8c69-90d745ce4127",
+      "credentials": {
+        "telegramApi": {
+          "id": "FNBQFIRiRqrrgJtN",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendChatAction",
+        "chatId": "={{ $json.message.chat.id }}"
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        500
+      ],
+      "id": "28dd3fbb-f86a-4ab6-a592-4099b21d79f8",
+      "name": "Send Typing Indicator",
+      "webhookId": "134b6c26-c09d-4bc6-92a6-81243914c004",
+      "credentials": {
+        "telegramApi": {
+          "id": "FNBQFIRiRqrrgJtN",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').item.json.message.text }}",
+        "options": {
+          "systemMessage": "Ты — AI-консультант по карьерному пути. Помогаешь пользователю проанализировать его опыт и подобрать подходящие профессии.\n\nТВОЯ ЗАДАЧА — провести структурированное интервью из 7 вопросов, ЗАДАВАЯ ИХ ПО ОДНОМУ и дожидаясь ответа на каждый.\n\nСПИСОК ВОПРОСОВ (задавай строго по порядку):\n1. Твой предыдущий жизненный опыт и достижения\n2. Опыт прохождения отборочного бассейна (как субъективный опыт, так и объективный, например, данные из датасета-лога: «я вошел в топ-5 среди 100 человек по времени, проведенному за АРМ»)\n3. Твой возраст, место проживания\n4. Твои интересы и любимые занятия\n5. Цели обучения и желаемая скорость их достижения\n6. Сильные и слабые стороны (по твоему мнению)\n7. Желаемый формат работы (удаленно/оффлайн), размер компании\n\nПРАВИЛА:\n- Если это первое сообщение, поприветствуй пользователя и задай вопрос №1\n- Запоминай ответы и НЕ повторяй вопросы, на которые уже ответили\n- После получения ответа сразу задавай следующий вопрос из списка\n- Будь поддерживающим и по-дружески уточняй детали при необходимости\n- Когда все 7 вопросов заданы, поблагодари сделай анализ всех предыдущих ответов пользователя и сразу выдай ему свои рекомендации по выбору карьерного пути"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        1560,
+        500
+      ],
+      "id": "e1fd281c-bb38-44d4-85d7-c7d66da4a366",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "GigaChat/GigaChat-2-Max",
+          "mode": "list",
+          "cachedResultName": "GigaChat/GigaChat-2-Max"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1520,
+        720
+      ],
+      "id": "09be5f6b-4b82-42e1-8524-84c0fc7fecae",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "mNtNKxG1UdpLQFnJ",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1708,
+        720
+      ],
+      "id": "ab4b9b15-ca1e-40e7-bedd-2c8ac2e4c241",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1936,
+        500
+      ],
+      "id": "caf87eed-c335-472e-9e21-6f3b7647aebd",
+      "name": "Telegram",
+      "webhookId": "37b016c2-5042-4d17-aaa1-f059f87aec6d",
+      "credentials": {
+        "telegramApi": {
+          "id": "FNBQFIRiRqrrgJtN",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Typing Indicator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Typing Indicator": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "2e46cef6-0f9e-4349-8160-b160fb5c826d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "899191813b11fe87cd4aaac6f1c5befb8b483d20520c6567e241e322ebf82b1c"
+  },
+  "id": "PQbRkOiO90oQkj1l",
+  "tags": []
+}

@@ -1,0 +1,673 @@
+{
+  "name": "Static Data - Topics List",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Get the input from previous node\nconst inputData = $input.first().json;\nlet rawOutput = inputData.output || \"\";\n\n// ROBUST PARSING: Find the JSON object regardless of Markdown or extra text\nconst firstBrace = rawOutput.indexOf('{');\nconst lastBrace = rawOutput.lastIndexOf('}');\n\nif (firstBrace === -1 || lastBrace === -1) {\n  throw new Error(\"No valid JSON object found in the AI response\");\n}\n\n// Extract only the JSON part\nconst jsonString = rawOutput.substring(firstBrace, lastBrace + 1);\n\ntry {\n  const parsedData = JSON.parse(jsonString);\n\n  // Store in static data\n  const staticData = $getWorkflowStaticData('global');\n\n  delete staticData.queue;\n  delete staticData.totalItems; \n  \n  staticData.courseStructure = parsedData;\n\n  return [{\n    json: {\n      success: true,\n      message: 'Data stored in static data',\n      storedData: parsedData\n    }\n  }];\n} catch (error) {\n  throw new Error(`JSON Parse Failed: ${error.message}`);\n}"
+      },
+      "id": "dee68710-0e44-4f9e-9b0c-6f8eda860418",
+      "name": "Save Topic to Static Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "={{ $json.formatted }},\n\nесли хочешь изучить - */da*\n\nначать другую тему - */reset*",
+        "additionalFields": {}
+      },
+      "id": "7c145fd2-125f-418f-bdf3-82022eaa58e8",
+      "name": "Telegram Send",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2496,
+        372
+      ],
+      "webhookId": "03ccf16d-1e68-4b52-ba9e-5a974a22ce92",
+      "credentials": {
+        "telegramApi": {
+          "id": "wPfQZj2jXjF7YV8u",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "5debc4ce-138b-4719-b12a-0e03909369cd",
+      "name": "Telegram Trigger1",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        128
+      ],
+      "webhookId": "ce02b6b2-adc8-4afe-bb18-e73e6c94e67f",
+      "credentials": {
+        "telegramApi": {
+          "id": "wPfQZj2jXjF7YV8u",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ec60b4dc-6bb9-4536-8192-196511fbce85",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/start",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "08825906-f5ba-4c96-a698-af2f52250eb8",
+              "leftValue": "",
+              "rightValue": "/reset",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1040,
+        128
+      ],
+      "id": "2b92386c-1467-4638-83f6-39db34ec1962",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "Сообщи тему, которую хочешь изучить и на каком уровне сложности",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        32
+      ],
+      "id": "0cb90237-a258-4df3-99d4-bb6187209c0c",
+      "name": "Send a text message",
+      "webhookId": "8ecd2d69-22ad-495a-ad72-c05ed34e1c46",
+      "credentials": {
+        "telegramApi": {
+          "id": "wPfQZj2jXjF7YV8u",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Помоги мне разработать план обучения по моей теме {{ $json.message.text }}",
+        "options": {
+          "systemMessage": "=Ты опытный методолого\n\nТвоя задача по выбранной пользователем теме и уровне сложности {{ $('Telegram Trigger1').item.json.message.text }} и разработать план обучения из наскольких кратких пунктов. ***Уточнять ничего нельзя*** сделай свое лучшее предположение и сразу начинай поиск и выдай пользователю краткий план обучения строго в виде JSON:\nТема 1: [понятие 1, понятие 2, понятие 3...]\nТема 2: [понятие 1, понятие 2, понятие 3...]"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        1696,
+        368
+      ],
+      "id": "c528a34a-6df5-4989-b0e7-96bf2588c958",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "GigaChat/GigaChat-2-Max",
+          "mode": "list",
+          "cachedResultName": "GigaChat/GigaChat-2-Max"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "responseFormat": "json_object"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1704,
+        596
+      ],
+      "id": "7e72add7-6238-4b2f-892c-50283838a714",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "fwhaXJqRuclAX0jj",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const courseData = $input.first().json.storedData;\n\n// Format the output\nconst formattedLines = [];\nlet topicNumber = 1;\n\nfor (const [topic, concepts] of Object.entries(courseData)) {\n  const conceptsList = concepts.join(', ');\n  formattedLines.push(`Тема ${topicNumber}: ${topic}: [${conceptsList}]`);\n  topicNumber++;\n}\n\nconst formattedOutput = formattedLines.join('\\n\\n');\n\nreturn [{\n  json: {\n    formatted: formattedOutput\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        372
+      ],
+      "id": "60de24fe-a559-4c42-8ac5-0951e71df862",
+      "name": "Format Output"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "714e0ab4-9c7b-4b5b-b3e8-f020547a1a83",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/da",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1472,
+        224
+      ],
+      "id": "c12321a5-7a32-41ac-a8dd-0ed7349ee820",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// Initialize queue if not exists\nif (!staticData.queue) {\n  if (!staticData.courseStructure) {\n    return [{\n      json: {\n        error: true,\n        message: 'No course data found in static data'\n      }\n    }];\n  }\n  \n  // Build the queue from courseStructure\n  const queue = [];\n  let topicNumber = 1;\n  \n  for (const [topic, submodules] of Object.entries(staticData.courseStructure)) {\n    let submoduleNumber = 1;\n    for (const submodule of submodules) {\n      queue.push({\n        topicNumber,\n        topicName: topic,\n        submoduleNumber,\n        submoduleName: submodule,\n        totalSubmodulesInTopic: submodules.length\n      });\n      submoduleNumber++;\n    }\n    topicNumber++;\n  }\n  \n  staticData.queue = queue;\n  staticData.totalItems = queue.length;\n}\n\n// Check if queue is empty\nif (staticData.queue.length === 0) {\n  // Cleanup and signal completion\n  delete staticData.courseStructure;\n  delete staticData.queue;\n  delete staticData.totalItems;\n  \n  return [{\n    json: {\n      done: true,\n      message: 'All items processed, static data cleared'\n    }\n  }];\n}\n\n// Get next item from queue\nconst currentItem = staticData.queue.shift();\nconst remaining = staticData.queue.length;\nconst processed = staticData.totalItems - remaining;\n\n// Check if this was the last item\nif (remaining === 0) {\n  // Cleanup after returning last item\n  delete staticData.courseStructure;\n  delete staticData.queue;\n  delete staticData.totalItems;\n}\n\nreturn [{\n  json: {\n    done: false,\n    topicNumber: currentItem.topicNumber,\n    topic: currentItem.topicName,\n    submoduleNumber: currentItem.submoduleNumber,\n    submodule: currentItem.submoduleName,\n    processed,\n    remaining,\n    progress: `${processed}/${processed + remaining}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        80
+      ],
+      "id": "ee3824db-1d01-4175-981d-e258f73a949d",
+      "name": "splitter"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "={{ $json.output }},\n\nесли хочешь увидеть следующий пост из этого курса напиши */da*\n\nесли хочешь начать новую тему - введи */reset*",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2560,
+        -96
+      ],
+      "id": "a25dbedd-193a-4e42-a221-11536399955a",
+      "name": "spitter",
+      "webhookId": "fe0940e7-0c32-4c44-ba14-63d29cc72806",
+      "credentials": {
+        "telegramApi": {
+          "id": "wPfQZj2jXjF7YV8u",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c66899bf-785b-4e0d-af6d-3793b4553c8d",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/reset",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1232,
+        240
+      ],
+      "id": "28e2bbaf-6056-43ee-8b81-c32300800c12",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Access the global static data\nconst staticData = $getWorkflowStaticData('global');\n\n// List of keys your workflow uses\nconst keysToDelete = ['queue', 'courseStructure', 'totalItems'];\n\n// Loop through and delete them to reset the state\nkeysToDelete.forEach(key => {\n  if (staticData[key]) {\n    delete staticData[key];\n  }\n});\n\nreturn [{\n  json: {\n    success: true,\n    message: \"🔄 Память очищена. Можешь запросить новую тему\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        592
+      ],
+      "id": "94a2d795-4145-4710-afb1-a6fcb5b4864b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        592
+      ],
+      "id": "c8a7d549-5488-448c-8a72-e4a9439885d3",
+      "name": "Send a text message1",
+      "webhookId": "bde5d57a-31ae-498b-a887-6cb1348b3042",
+      "credentials": {
+        "telegramApi": {
+          "id": "wPfQZj2jXjF7YV8u",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e8c7e231-78f5-4463-ac8d-b3d7e4739498",
+              "leftValue": "={{ $json.topic }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1936,
+        80
+      ],
+      "id": "65000acf-068d-4bb8-8006-0831a66a943f",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger1').item.json.message.chat.id }}",
+        "text": "Плана для изучения пока нет - напиши тему, которую хочешь изучить и свой уровень знаний в ней",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2064,
+        -256
+      ],
+      "id": "80ba9be0-f838-43c0-a59e-198ddf99752a",
+      "name": "Send a text message2",
+      "webhookId": "e6fb39ca-84d2-46dd-95b9-1a4fcc39ad14",
+      "credentials": {
+        "telegramApi": {
+          "id": "wPfQZj2jXjF7YV8u",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Основная тема: {{ $json.topic }}; Подраздел: {{ $json.submodule }}",
+        "options": {
+          "systemMessage": "Ты учитель по с большим опытом преподавания {{ $json.topic }}\n\nТвоя задача обучить пользователя выбранному им подразделу в основной теме - нужно использовать инструмент ПОИСК ***** Search in Tavily ***** чтобы найти нужную информацию и, приведя ее в удобный для восприятия вид, подать пользователю в виде небольшого сообщения \n\nУкажи на каком этапе изучения темы сейчас находится пользователь:\n(Progress: {{ $json.progress }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2176,
+        -96
+      ],
+      "id": "ff2a1dfd-c4c8-409b-8d0d-169eac6246b6",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "GigaChat/GigaChat-2-Max",
+          "mode": "list",
+          "cachedResultName": "GigaChat/GigaChat-2-Max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2160,
+        192
+      ],
+      "id": "eaa8f2f0-9e83-42e9-a52a-a8f8fb55a516",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "fwhaXJqRuclAX0jj",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Search in Tavily",
+        "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Query', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "@tavily/n8n-nodes-tavily.tavilyTool",
+      "typeVersion": 1,
+      "position": [
+        2336,
+        112
+      ],
+      "id": "0bd42800-5175-42de-9aac-ff6890995dee",
+      "name": "Search in Tavily1",
+      "credentials": {
+        "tavilyApi": {
+          "id": "x08B7fJnAovtWweW",
+          "name": "Tavily account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Telegram Trigger1": [
+      {
+        "json": {
+          "update_id": 718150308,
+          "message": {
+            "message_id": 391,
+            "from": {
+              "id": 1809554343,
+              "is_bot": false,
+              "first_name": "Pavel",
+              "last_name": "Cesarenko",
+              "username": "pavelcesarenko",
+              "language_code": "ru"
+            },
+            "chat": {
+              "id": 1809554343,
+              "first_name": "Pavel",
+              "last_name": "Cesarenko",
+              "username": "pavelcesarenko",
+              "type": "private"
+            },
+            "date": 1764517944,
+            "text": "Python beginner"
+          }
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Save Topic to Static Data": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Save Topic to Static Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "splitter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "splitter": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message2": {
+      "main": [
+        []
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "spitter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search in Tavily1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4e0d0e9c-487c-4ead-9c73-2cc4dbb756c6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e3e049798a94e8d0a149b86a732881651dd59aa2da269368755e6e43f224f154"
+  },
+  "id": "HOURNsIKx6f8MuPg",
+  "tags": []
+}

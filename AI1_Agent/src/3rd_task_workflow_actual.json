@@ -1,0 +1,210 @@
+{
+  "name": "3rd task workflow actual",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "99600c63-b988-42c9-91ec-a3991dc437c7",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const channels = [\n  'devsp',\n  'datasciencejobs',\n  'not_boring_ds',\n  'datascienceml_jobs'\n];\n\nreturn channels.map(channel => {\n  return {\n    json: {\n      username: channel\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "ecff1c0c-5cd7-45f6-bdc9-760351b212e7",
+      "name": "Config Channels"
+    },
+    {
+      "parameters": {
+        "url": "=https://container-app-mar-advisor-rsshub.containerapps.ru/telegram/channel/{{ $json.username }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ],
+      "id": "5162aefe-eb95-4f01-8cfb-d9bb64de3482",
+      "name": "RSS Read",
+      "retryOnFail": false,
+      "maxTries": 2,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\n\n// Получаем дату последнего запуска или ставим дату 24 часа назад\nconst lastRunTime = staticData.lastRunTime \n  ? new Date(staticData.lastRunTime) \n  : new Date(new Date().getTime() - 24 * 60 * 60 * 1000);\n\n// Сохраняем текущее время\nstaticData.lastRunTime = new Date().toISOString();\n\nconst allItems = $input.all();\nconst newPosts = [];\n\nfor (const item of allItems) {\n  const dateStr = item.json.isoDate || item.json.pubDate || item.json.date;\n  \n  if (dateStr) {\n    const pubDate = new Date(dateStr);\n    if (pubDate > lastRunTime) {\n      \n      // ЛОГИКА ОПРЕДЕЛЕНИЯ ИМЕНИ КАНАЛА\n      let channelName = 'Unknown';\n      \n      // 1. Пробуем взять из метаданных фида\n      if (item.json.feed && item.json.feed.title) {\n        channelName = item.json.feed.title;\n      } \n      // 2. Если нет, пробуем вырезать из ссылки (t.me/username/123)\n      else if (item.json.link && item.json.link.includes('t.me/')) {\n        const match = item.json.link.match(/t\\.me\\/([^\\/]+)/);\n        if (match && match[1]) {\n           channelName = match[1]; // вернет 'datasciencejobs' например\n        }\n      }\n\n      newPosts.push({\n        channel: channelName,\n        content: item.json.contentSnippet || item.json.content,\n        link: item.json.link,\n        date: dateStr\n      });\n    }\n  }\n}\n\nif (newPosts.length === 0) {\n  return [];\n}\n\n// Группировка\nconst postsByChannel = {};\nnewPosts.forEach(post => {\n  if (!postsByChannel[post.channel]) {\n    postsByChannel[post.channel] = [];\n  }\n  postsByChannel[post.channel].push(post);\n});\n\nlet textForAI = \"ДАННЫЕ ДЛЯ ОБРАБОТКИ:\\n\\n\";\n\nfor (const [channel, posts] of Object.entries(postsByChannel)) {\n  textForAI += `=== НАЧАЛО КАНАЛА: ${channel} (Количество новых постов: ${posts.length}) ===\\n`;\n  posts.forEach((post) => {\n    const cleanContent = (post.content || \"\").replace(/\\s+/g, ' ').trim();\n    // Мы специально не нумеруем здесь посты цифрами, чтобы AI не путался\n    textForAI += `ПОСТ:\\nТекст: ${cleanContent}\\nСсылка: ${post.link}\\n---\\n`;\n  });\n  textForAI += \"=== КОНЕЦ КАНАЛА ===\\n\\n\";\n}\n\nreturn {\n  json: {\n    prompt_text: textForAI,\n    posts_count: newPosts.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "03cc4d45-84d5-4bdc-acda-ada6bdb61566",
+      "name": "Filter & Prepare"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt_text }}",
+        "options": {
+          "systemMessage": "Ты редактор дайджеста. Твоя задача — составить сводку новостей Data Science.\n\nФОРМАТ ОТВЕТА (СТРОГО СОБЛЮДАЙ):\n\n[Общее саммари одним абзацем про основные темы дня]\n\n[Пустая строка]\n\n[Название канала] - [Цифрой количество постов в этом канале]\n\n• [Сжатая суть поста], [Ссылка]\n• [Сжатая суть поста], [Ссылка]\n\n[Пустая строка]\n\n[Название канала 2] - [Количество постов]\n\n• [Сжатая суть поста], [Ссылка]\n\nВАЖНО:\n1. Не используй сквозную нумерацию (1, 2, 3...) для постов. Используй буллиты (•) или просто начинай с новой строки.\n2. Название канала бери ровно то, которое указано в строке \"НАЧАЛО КАНАЛА\".\n3. Ссылку бери из поля \"Ссылка\".\n4. Если текста поста нет или он мусорный — пропусти этот пост, но не выдумывай."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.8,
+      "position": [
+        880,
+        0
+      ],
+      "id": "a8c9b2e9-16de-4405-b232-ed7e0658db8b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "GigaChat/GigaChat-2-Max",
+          "mode": "list",
+          "cachedResultName": "GigaChat/GigaChat-2-Max"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        220
+      ],
+      "id": "29a8f2c3-f297-4295-99ad-20342fc39860",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "mNtNKxG1UdpLQFnJ",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-1003408845019",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1240,
+        0
+      ],
+      "id": "38b31dc1-2a06-425e-b6d8-31020fd33796",
+      "name": "Telegram",
+      "webhookId": "d869387e-02e0-4624-a369-7c7c3c69bba7",
+      "credentials": {
+        "telegramApi": {
+          "id": "FNBQFIRiRqrrgJtN",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Config Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config Channels": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Filter & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter & Prepare": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fbaeb2c5-af4e-4e7e-b947-a3cf8da8073b",
+  "meta": {
+    "instanceId": "899191813b11fe87cd4aaac6f1c5befb8b483d20520c6567e241e322ebf82b1c"
+  },
+  "id": "DS4Jan0RKy3in9lf",
+  "tags": []
+}
